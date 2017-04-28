@@ -8,10 +8,15 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express';
 import { SubscriptionServer } from 'subscriptions-transport-ws';
 import { subscriptionManager } from './subscriptions';
 
+import OpticsAgent from 'optics-agent';
+
 import schema from './schema';
+import logger from './winston';
 
 const PORT = 3020;
 const SUBSCRIPTIONS_PATH = '/subscriptions';
+
+OpticsAgent.instrumentSchema(schema);
 
 var app = express();
 
@@ -20,7 +25,19 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.use('/graphql', graphqlExpress({ schema }));
+app.use('/graphql', OpticsAgent.middleware());
+
+app.use('/graphql', graphqlExpress((req) => {
+
+  logger.info({message:'there was a request'});
+
+  return {
+    schema,
+    context: {
+      opticsContext: OpticsAgent.context(req),
+    }
+  };
+}));
 
 app.use('/graphiql', graphiqlExpress({
   endpointURL: '/graphql',
